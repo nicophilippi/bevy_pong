@@ -1,14 +1,16 @@
 use bevy::prelude::*;
 
 
-const PADDLE_SIZE: Vec2 = Vec2::new(30.0, 300.0);
-const PADDLE_CENTER_OFFSET: f32 = 550.0;
+const PADDLE_SIZE: Vec2 = Vec2::new(30.0, 150.0);
+const PADDLE_CENTER_OFFSET: f32 = (WORLD_SIZE.x - PADDLE_SIZE.x) / 2.0;
 const PADDLE_COLOR: Color = Color::WHITE;
 const PADDLE_SPEED: f32 = 300.0;
 const PADDLE_RIGHT_UP: KeyCode = KeyCode::ArrowUp;
 const PADDLE_RIGHT_DOWN: KeyCode = KeyCode::ArrowDown;
 const PADDLE_LEFT_UP: KeyCode = KeyCode::KeyW;
 const PADDLE_LEFT_DOWN: KeyCode = KeyCode::KeyS;
+
+const WORLD_SIZE: Vec2 = Vec2::new(1100.0, 600.0);
 
 
 fn main() {
@@ -24,7 +26,8 @@ struct PongGamePlugin;
 impl Plugin for PongGamePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, start_up)
-            .add_systems(FixedUpdate, TransformInputMover::fixedupdate_move_system);
+            .add_systems(FixedUpdate, TransformInputMover::fixedupdate_move_system)
+            .add_systems(FixedPostUpdate, TransformBoundsBox::fixedpostupdate_system);
     }
 }
 
@@ -32,6 +35,12 @@ impl Plugin for PongGamePlugin {
 fn start_up(mut commands: Commands) {
 
     commands.spawn(Camera2d);
+
+    // World background
+    commands.spawn((
+        Sprite::from_color(Color::BLACK, WORLD_SIZE),
+        Transform::from_translation(Vec3::default().with_z(-1.0))
+    ));
 
     // Left
     spawn_paddle(&mut commands, PADDLE_LEFT_UP, PADDLE_LEFT_DOWN,
@@ -56,12 +65,17 @@ fn spawn_paddle(commands: &mut Commands, key_up: KeyCode, key_down: KeyCode, cen
         ..Default::default()
     };
 
-    commands.spawn((trs, sprite, mover));
+    let bounds = TransformBoundsBox {
+        upper_bounds: Some((WORLD_SIZE.y - PADDLE_SIZE.y) / 2.0),
+        lower_bounds: Some(-(WORLD_SIZE.y - PADDLE_SIZE.y) / 2.0),
+        ..Default::default()
+    };
+
+    commands.spawn((trs, sprite, mover, bounds));
 }
 
 
 #[derive(Component, Debug, Default)]
-#[require(Transform)]
 struct TransformInputMover {
     pub key_up: Option<KeyCode>,
     pub key_down: Option<KeyCode>,
@@ -105,6 +119,40 @@ impl TransformInputMover {
 }
 
 
+#[derive(Default, Component, Debug)]
+struct TransformBoundsBox {
+    pub upper_bounds: Option<f32>,
+    pub lower_bounds: Option<f32>,
+    pub right_bounds: Option<f32>,
+    pub left_bounds: Option<f32>,
+}
+
+impl TransformBoundsBox {
+    /// Must be called after all changes on Transforms have been made
+    pub fn fixedpostupdate_system(query: Query<(&TransformBoundsBox, &mut Transform)>) {
+        for (bounds, mut trs) in query {
+
+            if let Some(v) = bounds.upper_bounds {
+                trs.translation.y = v.min(trs.translation.y);
+            }
+
+            if let Some(v) = bounds.lower_bounds {
+                trs.translation.y = v.max(trs.translation.y);
+            }
+
+            if let Some(v) = bounds.right_bounds {
+                trs.translation.x = v.min(trs.translation.x);
+            }
+
+            if let Some(v) = bounds.left_bounds {
+                trs.translation.x = v.max(trs.translation.x);
+            }
+        }
+    }
+}
+
+
+
 #[derive(Component, Default, Debug)]
 struct AABBCollider {
     pub size: Vec2,
@@ -142,6 +190,8 @@ impl AABBCollider {
         query: Query<(&AABBCollider, Option<&Transform>, Entity)>,
         event_writer: EventWriter<AABBCollisionEvent>,
     ) {
+        todo!();
+
         for (l_col, l_trs, l_entity) in query {
             for (r_col, r_trs, r_entity) in query {
 
@@ -158,7 +208,7 @@ impl AABBCollider {
                 let r_min = r_col.get_min_offsetted(r_trs);
 
                 if l_min.x <= r_max.x && l_max.x >= r_min.x && l_min.y <= r_max.y && l_max.y >= r_min.y {
-                    event_writer
+                    
                 }
             }
         }
