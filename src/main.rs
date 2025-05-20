@@ -1,3 +1,5 @@
+use std::intrinsics::offset;
+
 use bevy::prelude::*;
 
 
@@ -27,7 +29,11 @@ impl Plugin for PongGamePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, start_up)
             .add_systems(FixedUpdate, TransformInputMover::fixedupdate_move_system)
-            .add_systems(FixedPostUpdate, TransformBoundsBox::fixedpostupdate_system);
+            .add_systems(FixedPostUpdate, (
+                TransformBoundsBox::fixedpostupdate_system,
+                AABBCollider::fixedupdate_collisiondetect_system,
+                AABBCollisionEvent::debug_system,
+            ));
     }
 }
 
@@ -49,6 +55,12 @@ fn start_up(mut commands: Commands) {
     // Right
     spawn_paddle(&mut commands, PADDLE_RIGHT_UP, PADDLE_RIGHT_DOWN,
         Vec3::new(PADDLE_CENTER_OFFSET, 0.0, 0.0));
+
+
+    // Collision testing
+    commands.spawn(AABBCollider {
+        bounds: Rect::from_center_size(Vec2::ZERO, Vec2::splat(100.0))
+    });
 }
 
 fn spawn_paddle(commands: &mut Commands, key_up: KeyCode, key_down: KeyCode, center: Vec3) {
@@ -155,62 +167,71 @@ impl TransformBoundsBox {
 
 #[derive(Component, Default, Debug)]
 struct AABBCollider {
-    pub size: Vec2,
-    pub offset: Vec2,
+    pub bounds: Rect,
 }
 
-#[derive(Event)]
-struct AABBCollisionEvent(Entity, Entity);
+#[derive(Event, Debug)]
+struct AABBCollisionEvent {
+    pub l_entity: Entity,
+    pub l_bounds: Rect,
+    pub r_entity: Entity,
+    pub r_bounds: Rect,
+}
 
 impl AABBCollider {
-    pub fn get_min(&self) -> Vec2 {
-        self.offset - self.size / 2.0
-    }
-
-    pub fn get_min_offsetted(&self, trs: Option<&Transform>) -> Vec2 {
-        if let Some(trs) = trs {
-            return self.get_min() + trs.translation.xy();
-        }
-        self.get_min()
-    }
-
-    pub fn get_max(&self) -> Vec2 {
-        self.offset + self.size / 2.0
-    }
-
-    pub fn get_max_offsetted(&self, trs: Option<&Transform>) -> Vec2 {
-        if let Some(trs) = trs {
-            return self.get_max() + trs.translation.xy();
-        }
-        self.get_max()
-    }
-
-
     pub fn fixedupdate_collisiondetect_system(
         query: Query<(&AABBCollider, Option<&Transform>, Entity)>,
-        event_writer: EventWriter<AABBCollisionEvent>,
+        mut event_writer: EventWriter<AABBCollisionEvent>,
     ) {
-        todo!();
+        for [l, r] in query.iter_combinations() {
+            let (l_col, l_trs, l_entity) = l;
+            let (r_col, r_trs, r_entity) = r;
 
-        for (l_col, l_trs, l_entity) in query {
-            for (r_col, r_trs, r_entity) in query {
-
-                // TODO: Prevent that a collision is detected 2 times in either order
-                // iter_combinations_mut
-
-                if std::ptr::eq(l_col,  r_col) {
-                    continue;
-                }
-
-                let l_max = l_col.get_max_offsetted(l_trs);
-                let l_min = l_col.get_min_offsetted(l_trs);
-                let r_max = r_col.get_max_offsetted(r_trs);
-                let r_min = r_col.get_min_offsetted(r_trs);
-
-                if l_min.x <= r_max.x && l_max.x >= r_min.x && l_min.y <= r_max.y && l_max.y >= r_min.y {
-                    
-                }
+            if std::ptr::eq(l_col,  r_col) {
+                continue;
             }
+
+            let l_max = Self::offset_by_trs(l_col.bounds.max, l_trs);
+            let l_min = Self::offset_by_trs(l_col.bounds.min, l_trs);
+            let r_max = Self::offset_by_trs(r_col.bounds.max, r_trs);
+            let r_min = Self::offset_by_trs(r_col.bounds.min, r_trs);
+
+            if l_min.x <= r_max.x && l_max.x >= r_min.x && l_min.y <= r_max.y && l_max.y >= r_min.y {
+                event_writer.write(AABBCollisionEvent {
+                    l_entity,
+                    l_bounds: l_col.bounds,
+                    r_entity,
+                    r_bounds: r_col.bounds,
+                });
+            }
+        }
+    }
+
+
+    fn offset_by_trs(v: Vec2, trs: Option<&Transform>) -> Vec2 {
+        if let Some(x) = trs {
+            return v + x.translation.xy();
+        } v
+    }
+}
+
+impl AABBCollisionEvent {
+    pub fn other_entity(&self, this: Entity) -> Entity {
+        if this == self.l_entity {
+            return self.r_entity;
+        } self.l_entity
+    }
+
+    pub fn other_bounds(&self, this: Entity) -> Rect {
+        if this == self.l_entity {
+            return self.r_bounds;
+        } self.l_bounds
+    }
+
+
+    pub fn debug_system(mut reader: EventReader<AABBCollisionEvent>) {
+        for event in reader.read() {
+            println!("{:?}", event);
         }
     }
 }
