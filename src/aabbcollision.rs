@@ -1,8 +1,6 @@
-use std::f32::consts::FRAC_1_SQRT_2;
-
 use bevy::prelude::*;
 
-use crate::util::{self, RectSegment};
+use crate::util;
 
 
 #[derive(Component, Debug, Default)]
@@ -102,18 +100,7 @@ impl AABBCollisionEvent {
             other_bounds = self.l_bounds;
         }
 
-        match util::rect_segment_of_point(this_bounds, other_bounds.center()) {
-            RectSegment::DOWN => Vec2::new(0.0, -1.0),
-            RectSegment::UP => Vec2::new(0.0, 1.0),
-            RectSegment::RIGHT => Vec2::new(1.0, 0.0),
-            RectSegment::LEFT => Vec2::new(-1.0, 0.0),
-            RectSegment::UPPERRIGHT => Vec2::new(FRAC_1_SQRT_2, FRAC_1_SQRT_2),
-            RectSegment::LOWERRIGHT => Vec2::new(FRAC_1_SQRT_2, -FRAC_1_SQRT_2),
-            RectSegment::UPPERLEFT => Vec2::new(-FRAC_1_SQRT_2, FRAC_1_SQRT_2),
-            RectSegment::LOWERLEFT => Vec2::new(-FRAC_1_SQRT_2, -FRAC_1_SQRT_2),
-            RectSegment::MIDDLE => Vec2::ZERO,
-            _ => panic!("RectSegment undefined"),
-        }
+        util::rect_seg_normal(this_bounds, other_bounds.center()).normal()
     }
 
 
