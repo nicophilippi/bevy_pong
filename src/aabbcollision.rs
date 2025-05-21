@@ -9,6 +9,10 @@ pub struct AABBCollider {
 }
 
 
+#[derive(Component)]
+pub struct AABBCollisionAvoider;
+
+
 #[derive(Event, Debug)]
 pub struct AABBCollisionEvent {
     pub l_entity: Entity,
@@ -61,7 +65,7 @@ impl AABBCollider {
 
 
 impl AABBCollisionEvent {
-    pub fn entity_in_event(&self, e: Entity) -> bool {
+    pub fn contains(&self, e: Entity) -> bool {
         e == self.l_entity || e == self.r_entity
     }
 
@@ -88,19 +92,16 @@ impl AABBCollisionEvent {
 
     /// The normal of the contact point of the passed entity
     pub fn normal_of(&self, this: Entity) -> Vec2 {
-        let this_bounds : Rect;
-        let other_bounds : Rect;
-        if this == self.l_entity {
-            this_bounds = self.l_bounds;
-            other_bounds = self.r_bounds;
-        }
-        else {
-            self.assert_entity_in_event(this);
-            this_bounds = self.r_bounds;
-            other_bounds = self.l_bounds;
-        }
-
+        let (this_bounds, other_bounds) = self.this_other_bounds(this);
         util::rect_seg_normal(this_bounds, other_bounds.center()).normal()
+    }
+
+
+    /// What path this needs to take to get outside the Collision area of other
+    pub fn to_avoid(&self, this: Entity) -> Vec2 {
+        let (this_bounds, other_bounds) = self.this_other_bounds(this);
+        let no_area = util::rect_expand(other_bounds, this_bounds.size());
+        util::rect_to_outside(no_area, this_bounds.center())
     }
 
 
@@ -111,7 +112,40 @@ impl AABBCollisionEvent {
     }
 
 
+    pub fn this_other_bounds(&self, this: Entity) -> (Rect, Rect) {
+        self.assert_entity_in_event(this);
+        if this == self.l_entity {
+            return (self.l_bounds, self.r_bounds);
+        }
+        (self.r_bounds, self.l_bounds)
+    }
+
+
     fn assert_entity_in_event(&self, e: Entity) {
-        assert!(self.entity_in_event(e), "Entity not used in the Event. Use a try-method instead");
+        assert!(self.contains(e), "Entity not used in the Event. Use a try-method instead");
+    }
+}
+
+
+impl AABBCollisionAvoider {
+    pub fn fixedupdate_system(
+        query: Query<(&mut Transform, Entity), With<AABBCollisionAvoider>>,
+        mut reader: EventReader<AABBCollisionEvent>,
+    ) {
+        if reader.is_empty() {
+            return;
+        }
+
+        for (mut trs, entity) in query {
+            for event in reader.read() {
+                if !event.contains(entity) {
+                    continue;
+                }
+
+                // let prev_pos = trs.translation;
+                trs.translation += event.to_avoid(entity).extend(0.0);
+                // println!("Correcting \"{}\" from {} to {}", entity, prev_pos, trs.translation);
+            }
+        }
     }
 }

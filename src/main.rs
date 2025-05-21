@@ -40,7 +40,10 @@ impl Plugin for PongGamePlugin {
                 ),
                 TransformBoundsBox::after_moves_system,
                 AABBCollider::fixedupdate_collisiondetect_system,
-                Ball::fixedupdate_bounce_system,
+                (
+                    AABBCollisionAvoider::fixedupdate_system,
+                    Ball::fixedupdate_bounce_system,
+                ),
             ).chain())
             .add_event::<AABBCollisionEvent>();
     }
@@ -74,7 +77,7 @@ fn start_up(mut commands: Commands) {
         let sprite = Sprite::from_color(BALL_COLOR, Vec2::ONE);
         let trs = Transform::from_scale(BALL_SIZE.extend(1.0));
         let collider = AABBCollider::from_size(Vec2::ONE);
-        commands.spawn((trs, ball, sprite, collider));
+        commands.spawn((trs, ball, sprite, collider, AABBCollisionAvoider));
     }
 }
 
@@ -203,11 +206,18 @@ impl Ball {
 
 
     pub fn fixedupdate_bounce_system(query: Query<(Entity, &mut Ball)>, mut event_reader: EventReader<AABBCollisionEvent>) {
+
+        if event_reader.is_empty() {
+            return;
+        }
+
         for (entity, mut ball) in query {
             for event in event_reader.read() {
                 if let Some(other_entity) = event.try_other_entity(entity) {
+                    // let prev_velo = ball.velocity;
                     let normal = event.normal_of(other_entity);
                     ball.velocity = ball.velocity.reflect(normal);
+                    // println!("Reflecting \"{}\" from velo {} to {}", entity, prev_velo, ball.velocity);
                 }
             }
         }
