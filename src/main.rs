@@ -1,4 +1,4 @@
-use bevy::{math::VectorSpace, prelude::*};
+use bevy::prelude::*;
 
 
 const PADDLE_SIZE: Vec2 = Vec2::new(30.0, 150.0);
@@ -47,6 +47,9 @@ fn start_up(mut commands: Commands) {
         Transform::from_translation(Vec3::default().with_z(-1.0))
     ));
 
+    spawn_aabb_col_box(&mut commands,
+        Rect::from_center_size(Vec2::ZERO, WORLD_SIZE));
+
     // Left
     spawn_paddle(&mut commands, PADDLE_LEFT_UP, PADDLE_LEFT_DOWN,
         Vec3::new(-PADDLE_CENTER_OFFSET, 0.0, 0.0));
@@ -54,6 +57,14 @@ fn start_up(mut commands: Commands) {
     // Right
     spawn_paddle(&mut commands, PADDLE_RIGHT_UP, PADDLE_RIGHT_DOWN,
         Vec3::new(PADDLE_CENTER_OFFSET, 0.0, 0.0));
+}
+
+fn spawn_aabb_col_box(commands: &mut Commands, in_rect: Rect) {
+    const COL_WIDTH: f32 = 100.0;
+    for r in rect_box_in_with_rects(in_rect, COL_WIDTH) {
+        commands.spawn(AABBCollider { bounds: r });
+        // commands.spawn((Transform::from_translation(r.center().extend(0.0)), Sprite::from_color(Color::WHITE, r.size())));
+    }
 }
 
 fn spawn_paddle(commands: &mut Commands, key_up: KeyCode, key_down: KeyCode, center: Vec3) {
@@ -229,4 +240,22 @@ impl AABBCollisionEvent {
             println!("{:?}", event);
         }
     }
+}
+
+
+fn rect_box_in_with_rects(rect: Rect, result_width: f32) -> [Rect; 4] {
+    let center = rect.center();
+    let half_result_width = result_width / 2.0;
+    let rect_width = rect.width();
+    let rect_height = rect.height();
+    [
+        // Upper
+        Rect::from_center_size(Vec2::new(center.x, rect.max.y + half_result_width), Vec2::new(rect_width, result_width)),
+        // Lower
+        Rect::from_center_size(Vec2::new(center.x, rect.min.y - half_result_width), Vec2::new(rect_width, result_width)),
+        // Right
+        Rect::from_center_size(Vec2::new(rect.max.x + half_result_width, center.y), Vec2::new(result_width, rect_height)),
+        // Left
+        Rect::from_center_size(Vec2::new(rect.min.x - half_result_width, center.y), Vec2::new(result_width, rect_height)),
+    ]
 }
