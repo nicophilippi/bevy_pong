@@ -1,6 +1,4 @@
-use std::intrinsics::offset;
-
-use bevy::prelude::*;
+use bevy::{math::VectorSpace, prelude::*};
 
 
 const PADDLE_SIZE: Vec2 = Vec2::new(30.0, 150.0);
@@ -33,7 +31,8 @@ impl Plugin for PongGamePlugin {
                 TransformBoundsBox::fixedpostupdate_system,
                 AABBCollider::fixedupdate_collisiondetect_system,
                 AABBCollisionEvent::debug_system,
-            ));
+            ))
+            .add_event::<AABBCollisionEvent>();
     }
 }
 
@@ -55,12 +54,6 @@ fn start_up(mut commands: Commands) {
     // Right
     spawn_paddle(&mut commands, PADDLE_RIGHT_UP, PADDLE_RIGHT_DOWN,
         Vec3::new(PADDLE_CENTER_OFFSET, 0.0, 0.0));
-
-
-    // Collision testing
-    commands.spawn(AABBCollider {
-        bounds: Rect::from_center_size(Vec2::ZERO, Vec2::splat(100.0))
-    });
 }
 
 fn spawn_paddle(commands: &mut Commands, key_up: KeyCode, key_down: KeyCode, center: Vec3) {
@@ -191,12 +184,14 @@ impl AABBCollider {
                 continue;
             }
 
-            let l_max = Self::offset_by_trs(l_col.bounds.max, l_trs);
-            let l_min = Self::offset_by_trs(l_col.bounds.min, l_trs);
-            let r_max = Self::offset_by_trs(r_col.bounds.max, r_trs);
-            let r_min = Self::offset_by_trs(r_col.bounds.min, r_trs);
+            let l_offset = Self::offset_by_trs(l_trs);
+            let r_offset = Self::offset_by_trs(r_trs);
+            let l_max = l_col.bounds.max + l_offset;
+            let l_min = l_col.bounds.min + l_offset;
+            let r_max = r_col.bounds.max + r_offset;
+            let r_min = r_col.bounds.min + r_offset;
 
-            if l_min.x <= r_max.x && l_max.x >= r_min.x && l_min.y <= r_max.y && l_max.y >= r_min.y {
+            if l_min.x < r_max.x && l_max.x > r_min.x && l_min.y < r_max.y && l_max.y > r_min.y {
                 event_writer.write(AABBCollisionEvent {
                     l_entity,
                     l_bounds: l_col.bounds,
@@ -208,10 +203,10 @@ impl AABBCollider {
     }
 
 
-    fn offset_by_trs(v: Vec2, trs: Option<&Transform>) -> Vec2 {
+    fn offset_by_trs(trs: Option<&Transform>) -> Vec2 {
         if let Some(x) = trs {
-            return v + x.translation.xy();
-        } v
+            return x.translation.xy();
+        } Vec2::ZERO
     }
 }
 
