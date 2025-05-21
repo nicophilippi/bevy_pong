@@ -927,6 +927,7 @@ name = "bevy_pong"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bitflags 2.9.1",
 ]
 
 [[package]]

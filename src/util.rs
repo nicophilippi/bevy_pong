@@ -40,3 +40,37 @@ pub fn rect_try_transform_no_rot(rect: Rect, trs: Option<&Transform>) -> Rect {
     }
     rect
 }
+
+
+pub fn rect_segment_of_point(rect: Rect, p: Vec2) -> RectSegment {
+    let mut result = RectSegment::MIDDLE;
+    if p.x < rect.min.x {
+        result |= RectSegment::LEFT;
+    }
+    else if p.x > rect.max.x {
+        result |= RectSegment::RIGHT;
+    }
+    if p.y < rect.min.y {
+        result |= RectSegment::DOWN;
+    }
+    else if p.y > rect.max.y {
+        result |= RectSegment::UP;
+    }
+    result
+}
+
+
+bitflags::bitflags! {
+    #[derive(PartialEq)]
+    pub struct RectSegment : u8 {
+        const LEFT = 0b0000_0010;
+        const RIGHT = 0b0000_0001;
+        const UP = 0b0000_0100;
+        const DOWN = 0b0000_1000;
+        const MIDDLE = 0b0000_0000;
+        const UPPERLEFT = 0b0000_0110;
+        const UPPERRIGHT = 0b0000_0101;
+        const LOWERLEFT = 0b0000_1010;
+        const LOWERRIGHT = 0b0000_1001;
+    }
+}

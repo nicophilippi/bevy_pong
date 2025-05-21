@@ -1,6 +1,8 @@
+use std::f32::consts::FRAC_1_SQRT_2;
+
 use bevy::prelude::*;
 
-use crate::util;
+use crate::util::{self, RectSegment};
 
 
 #[derive(Component, Debug, Default)]
@@ -61,24 +63,57 @@ impl AABBCollider {
 
 
 impl AABBCollisionEvent {
-    pub fn try_other_entity(&self, e: Entity) -> Option<Entity> {
-        if e == self.l_entity {
+    pub fn entity_in_event(&self, e: Entity) -> bool {
+        e == self.l_entity || e == self.r_entity
+    }
+
+
+    pub fn try_other_entity(&self, this: Entity) -> Option<Entity> {
+        if this == self.l_entity {
             return Some(self.r_entity);
         }
-        if e == self.r_entity {
+        if this == self.r_entity {
             return Some(self.l_entity);
         }
         None
     }
 
-    pub fn bounds_of(&self, e: Entity) -> Option<Rect> {
-        if e == self.l_entity {
-            return Some(self.l_bounds);
+
+    pub fn other_bounds(&self, this: Entity) -> Rect {
+        if this == self.l_entity {
+            return self.r_bounds;
         }
-        if e == self.r_entity {
-            return Some(self.r_bounds);
+        self.assert_entity_in_event(this);
+        self.l_bounds
+    }
+
+
+    /// The normal of the contact point of the passed entity
+    pub fn normal_of(&self, this: Entity) -> Vec2 {
+        let this_bounds : Rect;
+        let other_bounds : Rect;
+        if this == self.l_entity {
+            this_bounds = self.l_bounds;
+            other_bounds = self.r_bounds;
         }
-        None
+        else {
+            self.assert_entity_in_event(this);
+            this_bounds = self.r_bounds;
+            other_bounds = self.l_bounds;
+        }
+
+        match util::rect_segment_of_point(this_bounds, other_bounds.center()) {
+            RectSegment::DOWN => Vec2::new(0.0, -1.0),
+            RectSegment::UP => Vec2::new(0.0, 1.0),
+            RectSegment::RIGHT => Vec2::new(1.0, 0.0),
+            RectSegment::LEFT => Vec2::new(-1.0, 0.0),
+            RectSegment::UPPERRIGHT => Vec2::new(FRAC_1_SQRT_2, FRAC_1_SQRT_2),
+            RectSegment::LOWERRIGHT => Vec2::new(FRAC_1_SQRT_2, -FRAC_1_SQRT_2),
+            RectSegment::UPPERLEFT => Vec2::new(-FRAC_1_SQRT_2, FRAC_1_SQRT_2),
+            RectSegment::LOWERLEFT => Vec2::new(-FRAC_1_SQRT_2, -FRAC_1_SQRT_2),
+            RectSegment::MIDDLE => Vec2::ZERO,
+            _ => panic!("RectSegment undefined"),
+        }
     }
 
 
@@ -86,5 +121,10 @@ impl AABBCollisionEvent {
         for event in reader.read() {
             println!("{:?}", event);
         }
+    }
+
+
+    fn assert_entity_in_event(&self, e: Entity) {
+        assert!(self.entity_in_event(e), "Entity not used in the Event. Use a try-method instead");
     }
 }

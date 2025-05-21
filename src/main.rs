@@ -1,3 +1,5 @@
+use std::f32::consts::SQRT_2;
+
 use bevy::prelude::*;
 use aabbcollision::*;
 
@@ -15,7 +17,7 @@ const PADDLE_LEFT_DOWN: KeyCode = KeyCode::KeyS;
 
 const WORLD_SIZE: Vec2 = Vec2::new(1100.0, 600.0);
 
-const BALL_START_VELOCITY: Vec2 = Vec2::new(100.0, 100.0);
+const BALL_START_VELOCITY: Vec2 = Vec2::new(150.0, 150.0);
 const BALL_COLOR: Color = Color::WHITE;
 const BALL_SIZE: Vec2 = Vec2::splat(10.0);
 
@@ -38,13 +40,10 @@ impl Plugin for PongGamePlugin {
                     TransformInputMover::fixedupdate_move_system,
                     Ball::fixedupdate_move_system,
                 ),
+                TransformBoundsBox::after_moves_system,
+                AABBCollider::fixedupdate_collisiondetect_system,
                 Ball::fixedupdate_bounce_system,
             ).chain())
-            .add_systems(FixedPostUpdate, (
-                TransformBoundsBox::fixedpostupdate_system,
-                AABBCollider::fixedupdate_collisiondetect_system,
-                AABBCollisionEvent::debug_system,
-            ))
             .add_event::<AABBCollisionEvent>();
     }
 }
@@ -78,8 +77,6 @@ fn start_up(mut commands: Commands) {
         let trs = Transform::from_scale(BALL_SIZE.extend(1.0));
         let collider = AABBCollider::from_size(Vec2::ONE);
         commands.spawn((trs, ball, sprite, collider));
-
-        // TODO: Does not detect any collision!?
     }
 }
 
@@ -111,7 +108,9 @@ fn spawn_paddle(commands: &mut Commands, key_up: KeyCode, key_down: KeyCode, cen
         ..Default::default()
     };
 
-    commands.spawn((trs, sprite, mover, bounds));
+    let collider = AABBCollider::from_size(Vec2::ONE);
+
+    commands.spawn((trs, sprite, mover, bounds, collider));
 }
 
 
@@ -169,7 +168,7 @@ struct TransformBoundsBox {
 
 impl TransformBoundsBox {
     /// Must be called after all changes on Transforms have been made
-    pub fn fixedpostupdate_system(query: Query<(&TransformBoundsBox, &mut Transform)>) {
+    pub fn after_moves_system(query: Query<(&TransformBoundsBox, &mut Transform)>) {
         for (bounds, mut trs) in query {
 
             if let Some(v) = bounds.upper_bounds {
@@ -209,7 +208,8 @@ impl Ball {
         for (entity, mut ball) in query {
             for event in event_reader.read() {
                 if let Some(other_entity) = event.try_other_entity(entity) {
-                    println!("BALL COLLISION!");
+                    let normal = event.normal_of(other_entity);
+                    ball.velocity = ball.velocity.reflect(normal);
                 }
             }
         }
