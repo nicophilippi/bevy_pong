@@ -15,6 +15,10 @@ const PADDLE_LEFT_DOWN: KeyCode = KeyCode::KeyS;
 
 const WORLD_SIZE: Vec2 = Vec2::new(1100.0, 600.0);
 
+const BALL_START_VELOCITY: Vec2 = Vec2::new(100.0, 100.0);
+const BALL_COLOR: Color = Color::WHITE;
+const BALL_SIZE: Vec2 = Vec2::splat(10.0);
+
 
 fn main() {
     App::new()
@@ -29,7 +33,13 @@ struct PongGamePlugin;
 impl Plugin for PongGamePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, start_up)
-            .add_systems(FixedUpdate, TransformInputMover::fixedupdate_move_system)
+            .add_systems(FixedUpdate, (
+                (
+                    TransformInputMover::fixedupdate_move_system,
+                    Ball::fixedupdate_move_system,
+                ),
+                Ball::fixedupdate_bounce_system,
+            ).chain())
             .add_systems(FixedPostUpdate, (
                 TransformBoundsBox::fixedpostupdate_system,
                 AABBCollider::fixedupdate_collisiondetect_system,
@@ -60,6 +70,17 @@ fn start_up(mut commands: Commands) {
     // Right
     spawn_paddle(&mut commands, PADDLE_RIGHT_UP, PADDLE_RIGHT_DOWN,
         Vec3::new(PADDLE_CENTER_OFFSET, 0.0, 0.0));
+
+    // Ball
+    {
+        let ball = Ball { velocity: BALL_START_VELOCITY };
+        let sprite = Sprite::from_color(BALL_COLOR, Vec2::ONE);
+        let trs = Transform::from_scale(BALL_SIZE.extend(1.0));
+        let collider = AABBCollider::from_size(Vec2::ONE);
+        commands.spawn((trs, ball, sprite, collider));
+
+        // TODO: Does not detect any collision!?
+    }
 }
 
 fn spawn_aabb_col_box(commands: &mut Commands, in_rect: Rect) {
@@ -165,6 +186,31 @@ impl TransformBoundsBox {
 
             if let Some(v) = bounds.left_bounds {
                 trs.translation.x = v.max(trs.translation.x);
+            }
+        }
+    }
+}
+
+
+#[derive(Component, Debug, Default)]
+struct Ball {
+    pub velocity: Vec2,
+}
+
+impl Ball {
+    pub fn fixedupdate_move_system(query: Query<(&Ball, &mut Transform)>, time: Res<Time<Fixed>>) {
+        for (ball, mut trs) in query {
+            trs.translation += (ball.velocity * time.delta_secs()).extend(0.0);
+        }
+    }
+
+
+    pub fn fixedupdate_bounce_system(query: Query<(Entity, &mut Ball)>, mut event_reader: EventReader<AABBCollisionEvent>) {
+        for (entity, mut ball) in query {
+            for event in event_reader.read() {
+                if let Some(other_entity) = event.try_other_entity(entity) {
+                    println!("BALL COLLISION!");
+                }
             }
         }
     }

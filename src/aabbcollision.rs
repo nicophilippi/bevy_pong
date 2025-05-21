@@ -1,7 +1,9 @@
 use bevy::prelude::*;
 
+use crate::util;
 
-#[derive(Component, Default, Debug)]
+
+#[derive(Component, Debug, Default)]
 pub struct AABBCollider {
     pub bounds: Rect,
 }
@@ -17,6 +19,11 @@ pub struct AABBCollisionEvent {
 
 
 impl AABBCollider {
+    pub fn from_size(size: Vec2) -> Self {
+        Self { bounds: Rect::from_center_size(Vec2::ZERO, size)}
+    }
+
+
     pub fn fixedupdate_collisiondetect_system(
         query: Query<(&AABBCollider, Option<&Transform>, Entity)>,
         mut event_writer: EventWriter<AABBCollisionEvent>,
@@ -29,44 +36,49 @@ impl AABBCollider {
                 continue;
             }
 
-            let l_offset = Self::offset_by_trs(l_trs);
-            let r_offset = Self::offset_by_trs(r_trs);
-            let l_max = l_col.bounds.max + l_offset;
-            let l_min = l_col.bounds.min + l_offset;
-            let r_max = r_col.bounds.max + r_offset;
-            let r_min = r_col.bounds.min + r_offset;
+            let l_bounds = util::rect_try_transform_no_rot(l_col.bounds, l_trs);
+            let r_bounds = util::rect_try_transform_no_rot(r_col.bounds, r_trs);
+            let l_max = l_bounds.max;
+            let l_min = l_bounds.min;
+            let r_max = r_bounds.max;
+            let r_min = r_bounds.min;
+
 
             if l_min.x < r_max.x && l_max.x > r_min.x && l_min.y < r_max.y && l_max.y > r_min.y {
                 event_writer.write(AABBCollisionEvent {
                     l_entity,
-                    l_bounds: l_col.bounds,
+                    l_bounds,
                     r_entity,
-                    r_bounds: r_col.bounds,
+                    r_bounds,
                 });
             }
         }
     }
 
 
-    fn offset_by_trs(trs: Option<&Transform>) -> Vec2 {
-        if let Some(x) = trs {
-            return x.translation.xy();
-        } Vec2::ZERO
-    }
+    
 }
 
 
 impl AABBCollisionEvent {
-    pub fn other_entity(&self, this: Entity) -> Entity {
-        if this == self.l_entity {
-            return self.r_entity;
-        } self.l_entity
+    pub fn try_other_entity(&self, e: Entity) -> Option<Entity> {
+        if e == self.l_entity {
+            return Some(self.r_entity);
+        }
+        if e == self.r_entity {
+            return Some(self.l_entity);
+        }
+        None
     }
 
-    pub fn other_bounds(&self, this: Entity) -> Rect {
-        if this == self.l_entity {
-            return self.r_bounds;
-        } self.l_bounds
+    pub fn bounds_of(&self, e: Entity) -> Option<Rect> {
+        if e == self.l_entity {
+            return Some(self.l_bounds);
+        }
+        if e == self.r_entity {
+            return Some(self.r_bounds);
+        }
+        None
     }
 
 

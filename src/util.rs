@@ -16,3 +16,27 @@ pub fn rect_box_in_with_rects(rect: Rect, result_width: f32) -> [Rect; 4] {
         Rect::from_center_size(Vec2::new(rect.min.x - half_result_width, center.y), Vec2::new(result_width, rect_height)),
     ]
 }
+
+
+pub fn rect_offset(rect: Rect, offset: Vec2) -> Rect {
+    Rect { min: rect.min + offset, max: rect.max + offset }
+}
+
+
+/// Offsets the rect by translation, and resizes it by the scale from the center
+/// 
+/// All Operations use the xy() of Vec3s
+pub fn rect_transform_no_rot(rect: Rect, trs: &Transform) -> Rect {
+    Rect::from_center_size(rect.center() + trs.translation.xy(),
+        rect.size() * trs.scale.xy())
+}
+
+/// Offsets the rect by translation, and resizes it by the scale from the center
+/// 
+/// All Operations use the xy() of Vec3s
+pub fn rect_try_transform_no_rot(rect: Rect, trs: Option<&Transform>) -> Rect {
+    if let Some(trs) = trs {
+        return rect_transform_no_rot(rect, trs);
+    }
+    rect
+}
