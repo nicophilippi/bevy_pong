@@ -101,6 +101,7 @@ impl AABBCollisionEvent {
     pub fn to_avoid(&self, this: Entity) -> Vec2 {
         let (this_bounds, other_bounds) = self.this_other_bounds(this);
         let no_area = util::rect_expand(other_bounds, this_bounds.size());
+        // println!("{:?} {:?} {:?}", this_bounds, other_bounds, no_area);
         util::rect_to_outside(no_area, this_bounds.center())
     }
 

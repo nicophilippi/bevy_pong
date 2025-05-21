@@ -16,6 +16,7 @@ const PADDLE_LEFT_DOWN: KeyCode = KeyCode::KeyS;
 const WORLD_SIZE: Vec2 = Vec2::new(1100.0, 600.0);
 
 const BALL_START_VELOCITY: Vec2 = Vec2::new(150.0, 150.0);
+const BALL_START_POS: Vec2 = Vec2::new(-WORLD_SIZE.x / 2.0 + 20.0, -150.0);
 const BALL_COLOR: Color = Color::WHITE;
 const BALL_SIZE: Vec2 = Vec2::splat(10.0);
 
@@ -44,6 +45,7 @@ impl Plugin for PongGamePlugin {
                     AABBCollisionAvoider::fixedupdate_system,
                     Ball::fixedupdate_bounce_system,
                 ),
+                // AABBCollisionEvent::debug_system,
             ).chain())
             .add_event::<AABBCollisionEvent>();
     }
@@ -75,7 +77,8 @@ fn start_up(mut commands: Commands) {
     {
         let ball = Ball { velocity: BALL_START_VELOCITY };
         let sprite = Sprite::from_color(BALL_COLOR, Vec2::ONE);
-        let trs = Transform::from_scale(BALL_SIZE.extend(1.0));
+        let trs = Transform::from_scale(BALL_SIZE.extend(1.0))
+            .with_translation(BALL_START_POS.extend(0.0));
         let collider = AABBCollider::from_size(Vec2::ONE);
         commands.spawn((trs, ball, sprite, collider, AABBCollisionAvoider));
     }

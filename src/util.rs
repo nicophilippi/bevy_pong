@@ -75,7 +75,7 @@ pub fn rect_offset(rect: Rect, offset: Vec2) -> Rect {
 
 
 pub fn rect_expand(rect: Rect, expand: Vec2) -> Rect {
-    Rect { min: rect.min - expand / 2.0, max: rect.max / 2.0 }
+    Rect { min: rect.min - expand / 2.0, max: rect.max + expand / 2.0 }
 }
 
 
@@ -157,13 +157,12 @@ pub fn rect_seg_normal(rect: Rect, from: Vec2) -> RectSegment {
 
 pub fn rect_dist_outside(rect: Rect, from: Vec2) -> (RectSegment, f32) {
     let distances_outside = [
-        (RectSegment::RIGHT, from.x - rect.max.x),
-        (RectSegment::LEFT, rect.min.x - from.x),
-        (RectSegment::UP, from.y - rect.max.y),
-        (RectSegment::DOWN, rect.min.y - from.y),
+        (RectSegment::RIGHT, rect.max.x - from.x),
+        (RectSegment::LEFT, from.x - rect.min.x),
+        (RectSegment::UP, rect.max.y - from.y),
+        (RectSegment::DOWN, from.y - rect.min.y),
     ];
 
-    println!("{:?} {}: {:?}", rect, from, distances_outside);
     // We can just use x because in that case
     const NONE: (RectSegment, f32) = (RectSegment::NONE, f32::MAX);
     let mut result = NONE;
@@ -175,10 +174,7 @@ pub fn rect_dist_outside(rect: Rect, from: Vec2) -> (RectSegment, f32) {
             return NONE;
         }
 
-        if dist == result.1 {
-            result.0 |= seg;
-        }
-        else if dist < result.1 {
+        if dist <= result.1 {
             result.0 = seg;
             result.1 = dist;
         }
@@ -191,4 +187,63 @@ pub fn rect_dist_outside(rect: Rect, from: Vec2) -> (RectSegment, f32) {
 pub fn rect_to_outside(rect: Rect, from: Vec2) -> Vec2 {
     let (seg, dist) = rect_dist_outside(rect, from);
     seg.normal() * dist
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rect_to_outside_tests() {
+        assert!(rect_to_outside(
+            Rect::from_center_half_size(Vec2::ZERO, Vec2::splat(10.0)),
+            Vec2::new(15.0, 10.0)
+        ) == Vec2::ZERO);
+
+        assert!(rect_to_outside(
+            Rect::from_center_half_size(Vec2::ZERO, Vec2::splat(10.0)),
+            Vec2::new(1.0, 10.0)
+        ) == Vec2::ZERO);
+
+        assert!(rect_to_outside(
+            Rect::from_center_half_size(Vec2::ZERO, Vec2::splat(10.0)),
+            Vec2::new(-25.0, 10.0)
+        ) == Vec2::ZERO);
+
+        assert!(rect_to_outside(
+            Rect::from_center_half_size(Vec2::ZERO, Vec2::splat(10.0)),
+            Vec2::new(100.0, -10.0)
+        ) == Vec2::ZERO);
+
+        assert!(rect_to_outside(
+            Rect::from_center_half_size(Vec2::ZERO, Vec2::splat(10.0)),
+            Vec2::new(10.0, -10.0)
+        ) == Vec2::ZERO);
+
+        assert!(rect_to_outside(
+            Rect::from_center_half_size(Vec2::new(0.0, 5.0), Vec2::splat(10.0)),
+            Vec2::new(0.0, -6.0)
+        ) == Vec2::ZERO);
+
+        assert!(rect_to_outside(
+            Rect::from_center_half_size(Vec2::ZERO, Vec2::splat(10.0)),
+            Vec2::new(0.0, -6.0)
+        ) == Vec2::new(0.0, -4.0));
+
+        assert!(rect_to_outside(
+            Rect::from_center_half_size(Vec2::ZERO, Vec2::splat(10.0)),
+            Vec2::new(8.0, 9.0)
+        ) == Vec2::new(0.0, 1.0));
+
+        assert!(rect_to_outside(
+            Rect::from_center_half_size(Vec2::ZERO, Vec2::splat(10.0)),
+            Vec2::new(9.0, -3.0)
+        ) == Vec2::new(1.0, 0.0));
+
+        assert!(rect_to_outside(
+            Rect::from_center_half_size(Vec2::new(0.0, -5.0), Vec2::splat(10.0)),
+            Vec2::new(0.0, -3.0)
+        ) == Vec2::new(0.0, 8.0));
+    }
 }
